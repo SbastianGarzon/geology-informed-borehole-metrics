@@ -11,11 +11,11 @@ Additionally to reproduce the results, you need to download the `Data` folder fr
 
 ## Data preprocessing
 
-Once you have all folders (`stRata`,`experiment_scripts`, and `Data`) you can start with the experiment (in this case "Experiment_2025"). The first script will preprocess the data and create a new `Experiment_2025` folder:
+Once you have all folders (`stRata`,`experiment_scripts`, and `Data`) you can start with the experiment (in this case "Roer_valley_graben_2025"). The first script will preprocess the data and create a new `Roer_valley_graben_2025` folder:
 
 ```
 cd experiment_scripts
-Rscript CV_data_pre_shuffle.R Experiment_2025
+Rscript CV_data_pre_shuffle.R Roer_valley_graben_2025
 ```
 
 ## Reproducing one experiment
@@ -23,6 +23,6 @@ Rscript CV_data_pre_shuffle.R Experiment_2025
 Each experiment consists of an independent script (e.g. `NN_3_All.R`). For instance, to reproduce the cross-validation using the Neural Network (NN) arquitecture using all features (Set 3) you need to execute the following code:
 
 ```
-Rscript NN_3_All.R Experiment_2025
+Rscript NN_3_All.R Roer_valley_graben_2025
 ```
 
