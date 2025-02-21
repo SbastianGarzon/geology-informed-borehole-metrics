@@ -14,12 +14,18 @@ library(data.table)
 library(ggh4x)
 library(RColorBrewer)
 
+# Timer for script
 tic("Data Preparation")
+
+# Get name from experiment from command argument
+args <- commandArgs(trailingOnly=TRUE)
+experiment_name <- toString(args[[1]])
+
+# Loading Strata
 install.packages("../stRata", repos = NULL, type = "source", dependencies = TRUE, ask = FALSE)
 library(stRata)
 
-
-## Define constants (paths/Stratigraphic Order)
+## Define paths to data
 # Path to basis data
 basis_path = file.path("..","Data","basisdata","basisdata_gef_bovennaaronder_public_domain_RVG.csv")
 
@@ -28,9 +34,6 @@ dgm_path = file.path("..","Data","DGMplus_extractie","DGMplus_extractie_DGM_v02r
 
 # Path to Roer Valley Graben shapefile
 rvg_path = file.path("..","Data","RVG_shapefile","RVG_OK.shp")
-
-# Lithostratigraphic Units extent 
-units_extent_path = file.path("..","Data","Units_extent_nl.gpkg")
 
 ##### Load files ###
 
@@ -42,6 +45,7 @@ basisdata <- stRata::load_dataset(file_path = basis_path, crs_target =28992, are
 
 # Load dgm_extractie (Lithostratigraphic labels)
 dgm_extractie <-  stRata::load_dataset(file_path = dgm_path, crs_target =28992,cords_names = c("X","Y"), area_of_interest=rvg_shapefile)
+
 # Define stratigraphic order for plots
 
 stratigraphic_order <- c(
@@ -80,12 +84,6 @@ basis_dgm_roer_combined <- basis_dgm_roer_combined %>% filter(!strat_inter%in%c(
 
 unique_boreholes <- basis_dgm_roer_combined %>% group_by(nr) %>% slice(1) %>% st_as_sf(coords = c("x_28992","y_28992"),crs=st_crs(28992)) %>% select(nr)
 
-units_extent <- st_read(units_extent_path)
-
-units_per_borehole_coord <- stRata::formations_per_borehole_location(unique_boreholes,units_extent)
-
-units_per_borehole_coord$AAOP <- 1
-
 #Simplify Classes 
 
 # Load the CSV
@@ -95,6 +93,8 @@ basis_dgm_roer_combined$zmk_litho <- basis_dgm_roer_combined$zmk
 
 # Convert back to a named vector
 strat_class_map <- setNames(as.character(strat_class_map_df$value), strat_class_map_df$key)
+
+# Preprocessing for ZML_ML feature
 
 zmk_class_map <- c('ZUF'= 84,'ZUFO'= 84,'ZZF'= 127.5,
                    'ZZFO'= 127.5,'ZMF'= 180,'ZMFO'= 180,
@@ -114,8 +114,6 @@ basis_dgm_roer_combined$zmk_ml[basis_dgm_roer_combined$zmk_ml<63 | basis_dgm_roe
 
 basis_dgm_roer_combined <- stRata::simplify_classes(basis_dgm_roer_combined,"strat_inter",strat_class_map)
 
-#stratigraphic_order <- stratigraphic_order[!(stratigraphic_order %in% names(strat_class_map))]
-
 # Simplify Litho
 
 lithology <- read.csv2("../Data/categorieen_hoofdlitho.csv")
@@ -124,7 +122,8 @@ lithology_class_map <- setNames(lithology$categorie,lithology$code)
 basis_dgm_roer_combined$lith_plot <- basis_dgm_roer_combined$lith
 basis_dgm_roer_combined <- stRata::simplify_classes(basis_dgm_roer_combined,"lith",lithology_class_map)
 
-basis_dgm_roer_disc_0dot5 <- stRata::discretize_intervals(basis_dgm_roer_combined,0.5)
+# Discrqetize the data every 0.5 metres
+basis_dgm_roer_disc_0dot5 <- stRata::discretize_intervals(basis_dgm_roer_combined,interval = 0.5)
 
 basis_dgm_roer_disc_0dot5[, org := as.numeric(org)]
 basis_dgm_roer_disc_0dot5[, sh := as.numeric(sh)]
@@ -132,10 +131,16 @@ basis_dgm_roer_disc_0dot5[, sh := as.numeric(sh)]
 # Initial split (Labeled/Unlabeled)
 
 df_lab <- basis_dgm_roer_disc_0dot5[!is.na(strat_inter)]
+
+## For this experiment, we are not predicting in new boreholes, so there are no
+# unlabeled boreholes
 df_unlabeled <- basis_dgm_roer_disc_0dot5[is.na(strat_inter)]
 
 # Shuffle dataset (Original dataset is ordered by NR (Borehole code), 
 # so we shuffle by NR to get a random order)
+
+# Define seed for reproducibility
+set.seed(2013)
 
 df_labeled <- df_lab %>%
   group_by(nr) %>%
@@ -198,10 +203,9 @@ df_labeled <- df_labeled %>% filter(strat_inter !="NN")
 
 # Stratified group sampling
 
-set.seed(2013)
-
 k_fold <- stRata::stratified_group_sampling_k_fold(df_labeled,5)
 
+# Extract known transitions
 known_transitions <- extract_known_transitions(df_labeled)
 
 df_labeled$strat_inter <- droplevels(df_labeled$strat_inter)
@@ -212,24 +216,22 @@ names(fold_vector) <- rep(names(k_fold), lengths(k_fold))  # Ensure names are ju
 
 df_labeled$fold <- names(fold_vector)[match(df_labeled$nr, fold_vector)]
 
+# Get colors for stratigraphic units
 strat_colors_path <- file.path("..","Data","kleurcodes_strat.csv")
 color_vector <- get_strat_colors(strat_colors_path,stratigraphic_order)
 
+# Plot class distribution
 plot_class_prop <- plot_class_proportion(df_labeled,color_vector,stratigraphic_order)
 
+# Plot class distribution per fold
 plot_class_by_folds <- plot_class_prop_per_fold(df_labeled, stratigraphic_order,color_vector)
 
-# Export Relevant 
-
-args <- commandArgs(trailingOnly=TRUE)
-experiment_name <- toString(args[[1]])
-
+# Create folder for experiment
 dir.create(experiment_name)
 
+# Save data and export plots
 write.csv2(df_labeled,file.path(experiment_name,"df_labeled.csv"), row.names = FALSE)
-write.csv2(df_unlabeled,file.path(experiment_name,"df_unlabeled.csv"), row.names = FALSE)
-write.csv2(units_per_borehole_coord,file.path(experiment_name,"units_per_borehole_coord.csv"), row.names = FALSE)
 ggsave(file.path(experiment_name,"plot_class_distribution.pdf"),plot_class_prop, width = 12, height = 8)
-ggsave(file.path(experiment_name,"plot_class_proportion.pdf"),plot_class_by_folds, width=12,height=8)
+ggsave(file.path(experiment_name,"plot_class_proportion.pdf"),plot_class_by_folds, width=12,height = 8)
 toc()
 
