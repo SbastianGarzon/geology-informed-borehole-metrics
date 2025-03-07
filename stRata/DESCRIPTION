@@ -1,0 +1,22 @@
+Package: stRata
+Title: Automated lithostratigraphic descriptions
+Version: 0.0.0.9000
+Authors@R: 
+    person("Sebastián", "Garzón", , "j.s.garzonalvarado@uu.nl", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-8335-9312"))
+Description:  Package required to reproduce the paper "Assessment of automated stratigraphic interpretations of boreholes with geology-informed metrics".
+License: `use_mit_license()`
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports:
+	data.table (>= 1.9.4),
+	dplyr,
+	sf, 
+	reticulate,
+	ggh4x,
+	ggplot2,
+	tictoc,
+	zoo,
+	patchwork,
+	RColorBrewer
